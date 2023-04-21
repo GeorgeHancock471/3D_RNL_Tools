@@ -1,0 +1,462 @@
+
+
+enableDemo=0;
+showCone=0;
+
+
+//Functions
+//============================================
+close("*");
+
+// ROI by Name
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+
+}
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+
+
+// TestPoint
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+function TestPoint(Title) {
+Dialog.createNonBlocking("TestPoint");
+Dialog.createNonBlocking("Did " + Title + " work?");
+Dialog.show();
+
+}
+
+
+
+
+
+//Setup
+//============================================
+
+setBatchMode(true);
+
+
+
+
+
+
+
+
+
+imageDIR = getDirectory("Select folder");
+
+
+fileList=getFileList(imageDIR);
+
+
+
+
+Dialog.createNonBlocking("Settings");
+Dialog.addMessage("Requires a folder with subfolders containg depth maps 'Depth Map.tif'");
+Dialog.addChoice("Start Folder", fileList,fileList[0]);
+Dialog.addNumber("AngleintervalAngle", 30);
+Dialog.addNumber("radiusCrop ", 500, 1, 10,"mm");
+Dialog.addString("MapROI", "clutch", 40);
+Dialog.addString("CentreROI, location of cantre for circle", "clutch", 40);
+Dialog.addString("IgnoreROI, (none = no exclusion)", "none", 40);
+Dialog.show();
+
+
+startFolder= Dialog.getChoice();
+		startIndex = index(fileList,startFolder);
+		StartPosition=startIndex;
+
+intervalAngle = Dialog.getNumber();
+
+
+radius1 = Dialog.getNumber();
+diameter1 = radius1*2;
+
+
+MROI = Dialog.getString();
+
+
+
+
+CROI = Dialog.getString();
+
+IROI = Dialog.getString();
+
+//----------------------------------------------------------------------------------------------
+fixStartGate=0;
+HS=0;
+DS=0;
+zS=0;
+//----------------------------------------------------------------------------------------------
+
+
+
+
+// Run
+//=======================================================
+
+//Loop 
+for(z=StartPosition;z<fileList.length; z++){
+
+if(fixStartGate==1){
+z=zS;
+fixStartGate=0;
+}
+
+// Open Image
+//--------------------
+
+scanPath = imageDIR+fileList[z]+"Depth Map.tif";
+
+saveImagePath = imageDIR+fileList[z]+"minAngleMap_"+"_"+radius1+"_"+MROI+"_"+IROI+"_"+intervalAngle+".tif";
+
+
+if(File.exists(scanPath)){
+open(scanPath);
+
+
+
+// Get Rois & Normalise
+//-----------------------------------------
+
+run("To ROI Manager");
+
+
+
+// Get Centre Coordinates
+//--------------------------------------
+
+CROI_n = -1;
+
+nROIs =roiManager("count");
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(tStr==CROI) CROI_n=j;
+	}
+	
+if(CROI_n==-1){
+
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(endsWith(tStr,CROI)) CROI_n=j;
+	}
+}
+
+
+if(CROI_n==-1){ waitForUser("Missing_"+fileList[z]); exit }
+
+
+roiManager("select",CROI_n);
+Roi.getBounds(x, y, width, height);
+
+
+centreX = x+width/2;
+centreY = y+height/2;
+
+
+makeOval(centreX-radius1,centreY-radius1,diameter1,diameter1);
+Roi.getBounds(cr_x, cr_y, cr_width, cr_height);
+
+run("Crop");
+
+for(i=0;i<roiManager("count");i++){
+
+roiManager("Select",i);
+
+Roi.getBounds(x, y, width, height);
+
+Roi.move(x-cr_x,y-cr_y);
+
+roiManager("Update");
+
+
+}
+
+
+makeOval(0,0,diameter1,diameter1);
+run("Make Inverse");
+run("Set...","value=NaN");
+
+
+// Measure Dimensions
+//--------------------------------------
+
+
+MROI_n = -1;
+
+nROIs =roiManager("count");
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(tStr==MROI) MROI_n=j;
+	}
+
+if( MROI_n==-1){
+
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(endsWith(tStr,MROI)) MROI_n=j;
+	}
+}
+
+roiManager("Select",MROI_n);
+
+Roi.getBounds(mx, my, mwidth, mheight);
+
+diameter2 = mwidth+10;
+if(mheight+10>diameter2)diameter2=mheight+10;
+
+radius2 = diameter2/2;
+
+// Get Coordinates
+//------------------------------------------
+
+centreX=centreX-cr_x;
+centreY=centreY-cr_y;
+
+
+
+oX=centreX-radius2;
+oY=centreY-radius2;
+
+makeOval(oX,oY,diameter2,diameter2);
+
+
+Roi.getBounds(Nx, Ny, Nwidth, Nheight);
+
+Roi.getContainedPoints(CXpoints, CYpoints);
+minAngles=newArray(CXpoints.length);
+
+
+
+// Exclude?
+//------------------------------------------
+
+if(IROI != "none"){
+
+IROI_n = -1;
+
+	nROIs =roiManager("count");
+	for(j=0; j<nROIs; j++){
+		roiManager("Select", j);
+		tStr = getInfo("selection.name");
+		if(tStr==IROI) IROI_n=j;
+		}
+		
+	if(IROI_n==-1){
+
+	for(j=0; j<nROIs; j++){
+		roiManager("Select", j);
+		tStr = getInfo("selection.name");
+		if(endsWith(tStr,IROI)) IROI_n=j;
+		}
+	}
+
+
+}
+
+
+
+
+
+
+
+setBatchMode("Hide");
+
+// Measure Angles
+//------------------------------------------
+
+depth=getTitle();
+
+range=360;
+reps = range/intervalAngle;
+
+//Create Map
+newImage("AngleStack", "32-bit black", diameter2, diameter2, reps+1);
+
+sAv=newArray(radius2);
+sCv=newArray(radius2);
+
+for(V=0;V<range/intervalAngle;V++){ //Loop for angles in stack
+
+selectImage(depth);
+
+
+		for(X=0;X<CXpoints.length;X++){
+		Vangle=V*intervalAngle*PI/180;
+		Vx=centreX+sin(Vangle)*(radius1);
+		Vy=centreY+cos(Vangle)*(radius1);
+
+		x=CXpoints[X];
+		y=CYpoints[X];
+
+		run("Select None");
+
+		adj= Vx-x;
+		opp = Vy-y;
+
+		xd = adj / Math.sqrt(Math.sqr(adj));
+		yd = opp / Math.sqrt(Math.sqr(opp));
+
+
+		radiusT=Math.sqrt( Math.sqr(adj)+Math.sqr(opp));
+
+		tradjectory = asin ( (Vx-x) / radiusT );
+
+		adj =  Math.sqrt( Math.sqr(x-Vx)+ Math.sqr(y-Vy) );
+
+		minH = getPixel(x, y);
+		minRadius=radiusT-1;
+
+		if(radius1<minRadius) minRadius=radius1;
+		maxMinAngle=0;
+		mH=0;
+
+
+		for(nh =1; nh<minRadius; nh++){
+
+		  tx=x+Math.sqrt(Math.sqr((sin(tradjectory)*nh)))*xd;
+		  ty=y+Math.sqrt(Math.sqr((cos(tradjectory)*nh)))*yd;
+		  
+		  hv= getPixel(tx, ty)-minH; //(Opposite = hv)
+		  
+		  sA = atan(hv/nh)*180/PI; //Angle (Adjacent = nh)
+		  
+		  noGate=0;
+		  
+		  
+		  if(IROI!="none"){
+		  roiManager("Select",IROI_n);
+		  noGate=Roi.contains(tx,ty);
+		  }
+		  
+		  
+		  /*
+		  if(tx>imgX+imgW){ sA=0; nH=minRadius; noGate=1;}
+		  if(ty>imgY+imgH){ sA=0; nH=minRadius; noGate=1;}
+		  if(tx<imgX){ sA=0; nH=minRadius; noGate=1;}
+		  if(ty<imgY){ sA=0; nH=minRadius; noGate=1;}
+		  */
+		  
+		  if(noGate==0){
+		  if(sA>maxMinAngle) maxMinAngle=sA;
+		  sAv[radius1-1-(minRadius-nh)] = sAv[radius1-1-(minRadius-nh)] + sA;
+		  sCv[radius1-1-(minRadius-nh)] = sCv[radius1-1-(minRadius-nh)] + 1; 
+		  }
+
+		} //(nh)
+
+		minAngles[X]= maxMinAngle;
+
+		} //(X)
+
+
+
+
+
+selectImage("AngleStack");
+
+
+setSlice(V+1);
+
+for(X=0;X<minAngles.length;X++){
+
+xV=CXpoints[X]-oX ;
+yV=CYpoints[X]-oY;
+aV = minAngles[X];
+setPixel(xV,yV,aV);
+
+} //(X)
+
+
+
+
+
+
+
+print(V);
+} //(V)
+
+
+
+
+for(i=0;i<roiManager("count");i++){
+roiManager("Select",i);
+Roi.getBounds(x, y, width, height);
+Roi.move(x-oX,y-oY);
+roiManager("Update");
+}
+
+
+
+for(i=0;i<reps;i++){
+setSlice(i+1);
+run("Select All");
+run("Copy");
+setPasteMode("Add");
+run("Select All");
+setSlice(reps+1);
+run("Paste");
+
+}
+
+setSlice(reps+1);
+run("Divide...","value=reps");
+
+
+
+
+
+run("From ROI Manager");
+if(enableDemo!=1) saveAs("TIF", saveImagePath);
+
+
+
+close("*");
+
+
+
+
+} //exists
+
+print("Z="+fileList[z]);
+//selectWindow("log");
+
+} // loop bg (z)
+
+
+waitForUser("Done");

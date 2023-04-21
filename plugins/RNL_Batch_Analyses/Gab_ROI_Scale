@@ -1,0 +1,117 @@
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+saveTitles = newArray("File");
+
+
+Dialog.create("DoG");
+Dialog.addNumber("N_Octaves", 8, 1, 10,"");
+Dialog.addNumber("Offset Octaves", 0, 1, 10,"");
+Dialog.addString("ROI_Scale", "m1", 40);
+Dialog.show();
+
+
+nOctaves =  Dialog.getNumber(); 
+offset =  Dialog.getNumber(); 
+wlROI = Dialog.getString();
+
+
+
+
+// Make Sure all ROIs are in Image
+//---------------------------------
+nROI = roiManager("count");
+run("Select All");
+roiManager("Add");
+
+for(i=0;i<nROI;i++){
+roiManager("select", 0);
+selName = getInfo("selection.name");
+roiManager("select", newArray(0,nROI-i));
+roiManager("AND");
+roiManager("Add");
+roiManager("select", roiManager("count")-1);
+roiManager("rename",selName);
+roiManager("select",0);
+roiManager("delete");
+}
+
+
+
+// Rescale to ROI
+//-----------------
+run("Select None");
+
+nSelections=roiManager("count");
+
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( endsWith(selName, wlROI ) == 1){ 
+		i = nSelections;
+		}	
+	}//i
+
+getStatistics(area);
+wl =  Math.sqrt(area);
+
+
+minS = Math.pow(2,(nOctaves+offset));
+rescale=minS/(wl);
+
+
+w = getWidth();
+h = getHeight();
+
+w= w*(rescale);
+h=h*(rescale);
+run("Select None");
+run("Size...", "width=&w height=&h constrain average interpolation=Bilinear");
+
+	for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		run("Scale... ", "x=&rescale y=&rescale");	
+		roiManager("Update");
+	}//i
+
+
+
+
+run("Select None");
+run("DoG ROI bandpass smooth", "sigma1=1 sigma2=1.6 number_of_octaves="+nOctaves+" label=BG-1");
+

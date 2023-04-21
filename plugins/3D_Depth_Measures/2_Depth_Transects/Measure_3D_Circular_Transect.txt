@@ -1,0 +1,313 @@
+//Functions
+//============================================
+
+
+// ROI by Name
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+
+}
+
+
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+
+
+
+
+//Setup
+//============================================
+
+//setBatchMode(true);
+
+imageDIR = getDirectory("Select folder");
+
+labelsDIR = imageDIR +"labels.txt";
+
+fileList=getFileList(imageDIR);
+
+savePath = imageDIR+"Transect_Plot_Data_Circle.txt";
+
+if(File.exists(savePath)) File.delete(savePath);
+
+
+
+
+
+//Dialog
+//============================================
+
+
+
+Dialog.create("Variables");
+Dialog.addMessage("Requires a folder with subfolders containg depth maps 'Depth Map.tif'");
+Dialog.addNumber("Radius ", 300, 1, 10,"mm");
+Dialog.addString("CentreROI, location of cantre for circle", "Clutch", 40);
+Dialog.addString("Normalisation_Rois", "circleB,Background,Clutch", 40);
+Dialog.show();
+
+
+radius = Dialog.getNumber();
+diameter = radius*2;
+CROI = Dialog.getString();
+ROIListStr =  Dialog.getString(); 
+	ROIListStr = replace(ROIListStr,", ",",");
+	ROIList =  split(ROIListStr,",");
+
+
+
+
+//Label List
+//============================================
+
+
+saveTitles = Array.concat("Directory","Dist","Mean_Height","Min_Height","Max_Height");
+
+		for(i=0;i<ROIList.length;i++){
+		saveTitles = Array.concat(saveTitles,"Mean_"+ROIList[i]);
+		saveTitles = Array.concat(saveTitles,"Min_"+ROIList[i]);
+		saveTitles = Array.concat(saveTitles,"Max_"+ROIList[i]);
+		}
+		
+
+saveTitlesStr = String.join(saveTitles,"\t");
+
+
+File.append(saveTitlesStr, savePath);
+
+// Run
+//=======================================================
+
+setBatchMode(true);
+
+//Loop 
+for(z=0;z<fileList.length; z++){
+
+close("*");
+
+
+// Open Image
+//--------------------
+
+scanPath = imageDIR+fileList[z]+"Depth Map.tif";
+
+if(File.exists(scanPath)){
+open(scanPath);
+
+
+
+
+// Get Rois 
+//-------------------------------------
+
+run("To ROI Manager");
+
+
+
+// Get Centre Coordinates
+//--------------------------------------
+
+CROI_n = -1;
+
+nROIs =roiManager("count");
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(tStr==CROI) CROI_n=j;
+	}
+	
+if(CROI_n==-1){
+
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(endsWith(tStr,CROI)) CROI_n=j;
+	}
+}
+
+
+if(CROI_n==-1){ waitForUser("Missing_"+fileList[z]); exit }
+
+
+roiManager("select",CROI_n);
+Roi.getBounds(x, y, width, height);
+
+
+centreX = x+width/2;
+centreY = y+height/2;
+
+
+meansArray=newArray();
+minsArray=newArray();
+maxsArray=newArray();
+
+
+for(i=0;i<ROIList.length;i++){
+
+tT = ROIList[i];
+tI = -1;
+
+	for(j=0; j<nROIs; j++){
+		roiManager("Select", j);
+		tStr = getInfo("selection.name");
+		if(tStr==tT) tI=j;
+		}
+		
+if(tI==-1){
+
+for(j=0; j<nROIs; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	if(endsWith(tStr,tT)) tI=j;
+	}
+}
+
+
+
+
+		if(tI==-1){ //ROI not present
+		meansArray=Array.concat(meansArray,NaN);
+		minsArray=Array.concat(minsArray,NaN);
+		maxsArray=Array.concat(maxsArray,NaN);
+		
+		}else{ 
+		
+
+	roiManager("select", tI);
+	getStatistics(area,mean,min,max);
+			meansArray=Array.concat(meansArray,mean);
+			minsArray=Array.concat(minsArray,min);
+			maxsArray=Array.concat(maxsArray,max);
+
+		}
+
+}
+
+makeOval(centreX-radius,centreY-radius,diameter,diameter);
+Roi.getContainedPoints(xpoints, ypoints);
+
+dpoints=newArray(xpoints.length);
+harray=newArray(xpoints.length);
+
+
+	for(i=0;i<harray.length;i++){
+
+	xD = xpoints[i] - centreX;
+	yD = ypoints[i] - centreY;
+
+	Dist =Math.sqrt(Math.sqr(xD) + Math.sqr(yD));
+
+	Dist = parseInt(Dist);
+
+	if(Dist>radius) Dist=radius;
+
+	dpoints[i] = Dist;
+
+	harray[i] = getPixel(xpoints[i],ypoints[i]);
+
+	}
+
+
+
+counts=newArray(radius+1);
+heights=newArray(radius+1);
+minHs=newArray(radius+1);
+maxHs=newArray(radius+1);
+
+
+for(i=0;i<minHs.length;i++){
+minHs[i]=1000000000000000000000000000000000;
+maxHs[i]=-1000000000000000000000000000000000;
+}
+
+
+h=getPixel(centreX,centreY);
+counts=Array.concat(counts,0);
+hArray=Array.concat(hArray,h);
+
+minHs=Array.concat(minHs,h);
+maxHs=Array.concat(maxHs,h);
+
+
+distances=Array.getSequence(radius+1);
+
+	for(i=0;i<harray.length;i++){
+	ind = dpoints[i];
+	counts[ind] += 1;
+	heights[ind] += harray[i];
+	
+	if(harray[i]<minHs[ind]) minHs[ind]=harray[i];
+	if(harray[i]>maxHs[ind]) maxHs[ind]=harray[i];
+	}
+
+
+
+for(i=0;i<heights.length;i++){
+distances[i] = distances[i];
+heights[i] = (heights[i]/counts[i]);
+}
+
+minNorm=newArray(radius+1);
+nestNorm=newArray(radius+1);
+radiusNorm=newArray(radius+1);
+
+
+//Normalise
+for(i=0;i<heights.length;i++){
+	if(isNaN(heights[i])){
+	heights[i]=heights[i+1];
+	}
+}
+
+
+for(j=0;j<heights.length;j++){
+pasteArray=Array.concat(fileList[z],j,heights[j],minHs[j],maxHs[j]);
+
+for(i=0;i<minsArray.length;i++){
+pasteArray=Array.concat(pasteArray,meansArray[i],minsArray[i],maxsArray[i]);
+}
+
+
+pasteString = String.join(pasteArray,"\t");
+File.append(pasteString, savePath);
+}
+
+
+print(z);
+selectWindow("Log");
+
+
+}//(if)
+}//(Loop)
+
+
+waitForUser("3D Transects Complete");

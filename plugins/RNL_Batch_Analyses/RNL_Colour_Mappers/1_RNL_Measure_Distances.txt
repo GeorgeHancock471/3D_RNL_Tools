@@ -1,0 +1,222 @@
+/*
+_______________________________________________________________________
+
+	Title: RNL Measure Distances
+	Author: Jolyon Trosckianko & George Hancock
+	Date: 10/03/2023
+.................................................................................................................
+
+Description:
+''''''''''''''''''''''''''''''''
+
+This tool measures the RNL distances between ROIs in a given folder.
+
+_________________________________________________________________________
+*/
+
+
+
+
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+close("*");
+
+imageDIR = getDirectory("Select folder containing folders with multispectral image");
+
+fileList=getFileList(imageDIR);
+
+
+labelsDIR = imageDIR +"labels.txt";
+
+
+
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+/*
+//Label List
+//============================================
+
+INFO_str = File.openAsString(labelsDIR);
+INFO_array = split(INFO_str,"\n");
+
+Array.show(INFO_array);
+
+Label_array = newArray(INFO_array.length);
+
+for(i=0;i<Label_array.length;i++){
+tArr = split(INFO_array[i],"\t");
+if(tArr.length>1)
+Label_array[i] = tArr[0];
+}
+
+*/
+
+//saveTitles = split(INFO_array[0],"\t");
+
+saveTitles = newArray("File");
+
+
+
+
+
+
+StartPosition = 0;
+
+
+
+// LISTING CONE CATCH MODELS
+
+	modelPath = getDirectory("plugins")+"Cone Models";
+
+	modelList=getFileList(modelPath);
+
+	modelNames = newArray();
+
+	for(i=0; i<modelList.length; i++){
+		if(endsWith(modelList[i], ".class")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".class",""));
+		if(endsWith(modelList[i], ".CLASS")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".CLASS",""));
+	}
+	
+	for(i=0; i<modelNames.length; i++)
+		modelNames[i] = replace(modelNames[i], "_", " ");
+
+
+
+// LIST VISUAL SYSTEM WEBER FRACTIONS
+
+	vsPath = getDirectory("plugins")+"micaToolbox/weberFractions";
+	vsList=getFileList(vsPath);
+	vsNames = newArray();
+	vsNames = Array.concat("Custom", vsNames);
+
+	for(i=0; i<vsList.length; i++){
+		if(endsWith(vsList[i], ".txt")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".txt",""));
+		if(endsWith(vsList[i], ".TXT")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".TXT",""));
+	}
+		
+		
+
+// LISTING LUMINANCE OPTIONS
+
+lumChannelArray = newArray("none", "lw", "lw, mw");
+
+
+
+Dialog.create("Variables");
+
+Dialog.addChoice("Starting-Folder", fileList, fileList[0]); 
+Dialog.addChoice("End-Folder", fileList, fileList[fileList.length-1]); 
+Dialog.addString("fold_name","RNL_13_2000_George Peafowl D65");
+Dialog.show();
+
+
+startFolder = Dialog.getChoice();
+		startIndex = index(fileList,startFolder);
+		StartPosition=startIndex;
+		
+endFolder = Dialog.getChoice();
+		endIndex = index(fileList,endFolder);
+		EndPosition=endIndex;
+		
+foldName = Dialog.getString();
+
+
+
+fileSaveTitle = "RNL_Measures_"+foldName+".txt";
+fileSaveDIR = imageDIR + fileSaveTitle;
+
+
+titlesArray=newArray("File","RNL_ROI1","RNL_ROI2","RNL_Difference");
+titlesString=String.join(titlesArray,"\t");
+
+
+if(File.exists(fileSaveDIR)) File.delete(fileSaveDIR);
+
+File.append(titlesString,fileSaveDIR);
+
+for(j=StartPosition; j<=EndPosition; j++){
+
+
+setBatchMode(true);
+close("*");
+
+
+DIR = imageDIR+fileList[j]+foldName+"/";
+print(DIR);
+
+if(File.exists(DIR)){
+
+run("4.0) Compare RNL Distance", "threshold=0.9500 metric=Mean frequency=Yes choose=["+DIR+"]");
+
+resultsArray=newArray();
+
+labelList=Table.getColumn("Label");
+
+for(x=0;x<labelList.length;x++){
+for(y=0;y<labelList.length;y++){
+
+if(x!=y){
+
+Diff = getResult(labelList[x],y);
+
+rtS=newArray(fileList[j],labelList[x],labelList[y],Diff);
+rS=String.join(rtS,"\t");
+
+resultsArray=Array.concat(resultsArray,rS);
+
+}//(if)
+
+
+}}
+
+
+resultsString=String.join(resultsArray,"\n");
+
+File.append(resultsString,fileSaveDIR);
+
+print(fileList[i]);
+
+}//if
+}//( File loop);
+if(isOpen("Log"))close("Log");
+print("Done");

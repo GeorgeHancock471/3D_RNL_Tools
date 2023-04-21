@@ -1,0 +1,266 @@
+/*
+_______________________________________________________________________
+
+	Title: RNL Chimera
+	Author: Jolyon Trosckianko & George Hancock
+	Date: 10/03/2023
+.................................................................................................................
+
+Description:
+''''''''''''''''''''''''''''''''
+
+This tool measures either the Distance or Frequency difference between all ROIs
+
+_________________________________________________________________________
+*/
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+close("*");
+
+imageDIR = getDirectory("Select folder containing folders with multispectral image");
+
+fileList=getFileList(imageDIR);
+
+
+labelsDIR = imageDIR +"labels.txt";
+
+
+
+setBatchMode(false);
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+/*
+//Label List
+//============================================
+
+INFO_str = File.openAsString(labelsDIR);
+INFO_array = split(INFO_str,"\n");
+
+Array.show(INFO_array);
+
+Label_array = newArray(INFO_array.length);
+
+for(i=0;i<Label_array.length;i++){
+tArr = split(INFO_array[i],"\t");
+if(tArr.length>1)
+Label_array[i] = tArr[0];
+}
+
+*/
+
+//saveTitles = split(INFO_array[0],"\t");
+
+saveTitles = newArray("File");
+
+
+
+
+
+
+StartPosition = 0;
+
+
+
+// LISTING CONE CATCH MODELS
+
+	modelPath = getDirectory("plugins")+"Cone Models";
+
+	modelList=getFileList(modelPath);
+
+	modelNames = newArray();
+
+	for(i=0; i<modelList.length; i++){
+		if(endsWith(modelList[i], ".class")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".class",""));
+		if(endsWith(modelList[i], ".CLASS")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".CLASS",""));
+	}
+	
+	for(i=0; i<modelNames.length; i++)
+		modelNames[i] = replace(modelNames[i], "_", " ");
+
+
+
+// LIST VISUAL SYSTEM WEBER FRACTIONS
+
+	vsPath = getDirectory("plugins")+"micaToolbox/weberFractions";
+	vsList=getFileList(vsPath);
+	vsNames = newArray();
+	vsNames = Array.concat("Custom", vsNames);
+
+	for(i=0; i<vsList.length; i++){
+		if(endsWith(vsList[i], ".txt")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".txt",""));
+		if(endsWith(vsList[i], ".TXT")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".TXT",""));
+	}
+		
+		
+
+// LISTING LUMINANCE OPTIONS
+
+lumChannelArray = newArray("none", "lw", "lw, mw");
+
+rnlArray=newArray("Frequency","Distance");
+
+
+Dialog.create("Variables");
+
+Dialog.addChoice("Starting-Folder", fileList, fileList[0]); 
+Dialog.addChoice("End-Folder", fileList, fileList[fileList.length-1]); 
+Dialog.addString("fold_name1","RNL_13_2000_George Peafowl D65");
+Dialog.addString("fold_name2","RNL_13_2000_George Peafowl D65");
+Dialog.addString("ROI1","ClutchEx");
+Dialog.addString("ROI2","Nest");
+Dialog.addChoice("RNL Method", rnlArray);
+Dialog.show();
+
+
+startFolder = Dialog.getChoice();
+		startIndex = index(fileList,startFolder);
+		StartPosition=startIndex;
+		
+endFolder = Dialog.getChoice();
+		endIndex = index(fileList,endFolder);
+		EndPosition=endIndex;
+		
+foldName1 = Dialog.getString();
+foldName2 = Dialog.getString();
+ROI_name_1 = Dialog.getString();
+ROI_name_2 = Dialog.getString();
+
+RNL_Method= Dialog.getChoice();
+
+fileSaveTitle = "RNL_Chimera_"+RNL_Method+"_"+foldName1+"_"+ROI_name_1+"_"+ROI_name_2+".txt";
+fileSaveDIR = imageDIR + fileSaveTitle;
+
+
+titlesArray=newArray("File1","File2","Chimeara","RNL_ROI1","RNL_ROI2","RNL_Difference1","RNL_Difference2");
+titlesString=String.join(titlesArray,"\t");
+
+
+
+
+
+
+if(File.exists(fileSaveDIR)) File.delete(fileSaveDIR);
+
+File.append(titlesString,fileSaveDIR);
+
+for(j=StartPosition; j<=EndPosition; j++){
+
+
+
+
+DIR1 = imageDIR+fileList[j]+foldName1+"/";
+if(File.exists(DIR1)){
+
+tmpList=getFileList(DIR1);
+nm="NaN";
+for(i=0;i<tmpList.length;i++){
+if(endsWith(tmpList[i],ROI_name_1+".tif")) nm=tmpList[i];
+}
+
+DIR1=DIR1+nm;
+
+
+print(ROI_name_1);
+
+print(DIR1);
+
+if(File.exists(DIR1)){
+
+		for(k=StartPosition; k<=EndPosition; k++){
+
+		DIR2 = imageDIR+fileList[k]+foldName2+"/";
+		if(File.exists(DIR2)){
+		
+		
+		tmpList=getFileList(DIR2);
+		nm="NaN";
+		for(i=0;i<tmpList.length;i++){
+		if(endsWith(tmpList[i],ROI_name_2+".tif")) nm=tmpList[i];
+		}
+
+		DIR2=DIR2+nm;
+		
+		
+		if(File.exists(DIR2)){
+
+		
+		setBatchMode(false);
+		close("*");
+		
+		open(DIR1);
+		open(DIR2);
+
+		chimera=1;
+		
+		if(j==k) chimera=0;
+
+		if(RNL_Method=="Frequency") run("3.5) Compare RNL Colour Maps");
+		if(RNL_Method=="Difference") run("4.0) Compare RNL Distance", "threshold=0.9500 metric=Mean frequency=Yes");
+
+		resultsArray=newArray();
+
+		labelList=Table.getColumn("Label");
+		
+		r1= getResult(labelList[0],1);
+		r2= getResult(labelList[1],0);
+		
+		rtS=newArray(fileList[j],fileList[k],chimera,ROI_name_1,ROI_name_2,r1,r2);
+
+		resultsString=String.join(rtS,"\t");
+
+		File.append(resultsString,fileSaveDIR);
+		
+		print(fileList[j]+"_"+fileList[k]);
+
+
+		}//if
+		}//if
+		}//( File loop K);
+
+
+	}//if
+	}//if
+}//( File loop J);
+
+
+// if(isOpen("Log"))close("Log");
+print("Done");

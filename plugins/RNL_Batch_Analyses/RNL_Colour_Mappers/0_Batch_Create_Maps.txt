@@ -1,0 +1,330 @@
+/*
+_______________________________________________________________________
+
+	Title: Batch Create RNL Maps
+	Author: Jolyon Trosckianko & George Hancock
+	Date: 10/03/2023
+.................................................................................................................
+
+Description:
+''''''''''''''''''''''''''''''''
+This tool is useful for creating lots of RNL colour maps over and over again
+
+_________________________________________________________________________
+*/
+
+
+
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+close("*");
+
+imageDIR = getDirectory("Select folder containing folders with multispectral image");
+
+fileList=getFileList(imageDIR);
+
+
+labelsDIR = imageDIR +"labels.txt";
+
+
+
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+
+
+
+saveTitles = newArray("File");
+
+StartPosition = 0;
+
+
+
+// LISTING CONE CATCH MODELS
+
+	modelPath = getDirectory("plugins")+"Cone Models";
+
+	modelList=getFileList(modelPath);
+
+	modelNames = newArray();
+
+	for(i=0; i<modelList.length; i++){
+		if(endsWith(modelList[i], ".class")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".class",""));
+		if(endsWith(modelList[i], ".CLASS")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".CLASS",""));
+	}
+	
+	for(i=0; i<modelNames.length; i++)
+		modelNames[i] = replace(modelNames[i], "_", " ");
+
+
+
+// LIST VISUAL SYSTEM WEBER FRACTIONS
+
+	vsPath = getDirectory("plugins")+"micaToolbox/weberFractions";
+	vsList=getFileList(vsPath);
+	vsNames = newArray();
+	vsNames = Array.concat("Custom", vsNames);
+
+	for(i=0; i<vsList.length; i++){
+		if(endsWith(vsList[i], ".txt")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".txt",""));
+		if(endsWith(vsList[i], ".TXT")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".TXT",""));
+	}
+		
+		
+
+// LISTING LUMINANCE OPTIONS
+
+lumChannelArray = newArray("none", "lw", "lw, mw");
+
+		yesNo = newArray("No","Yes");
+
+Dialog.create("Variables");
+
+Dialog.addChoice("All in same folder?",yesNo);
+Dialog.addChoice("Starting-Folder", fileList, fileList[0]); 
+Dialog.addChoice("End-Folder", fileList, fileList[fileList.length-1]); 
+Dialog.addChoice("cone_model",modelNames, modelNames[0]);
+Dialog.addChoice("lum_channel",lumChannelArray, lumChannelArray[0]);
+Dialog.addChoice("weber-system",vsNames, vsNames[0]);
+Dialog.addNumber("visual-Acuity", 13);
+Dialog.addChoice("Use Acuity View?",yesNo);
+Dialog.addNumber("view-distance", 500);
+
+Dialog.addString("minPxScale", "None");
+Dialog.addString("ROI Choices", "c1", 40);
+Dialog.addString("Pre-Script, type 'None' if no scipt", "None", 40);
+
+Dialog.show();
+
+
+checkBox = Dialog.getChoice();
+
+
+startFolder = Dialog.getChoice();
+		startIndex = index(fileList,startFolder);
+		StartPosition=startIndex;
+		
+endFolder = Dialog.getChoice();
+		endIndex = index(fileList,endFolder);
+		EndPosition=endIndex;
+		
+coneMethod = Dialog.getChoice();
+lumMethod  = Dialog.getChoice(); 	
+webMethod  = Dialog.getChoice(); 
+
+acuity = Dialog.getNumber();
+useView = Dialog.getChoice();
+distanceView = Dialog.getNumber();
+
+minScale = Dialog.getString();
+ROIListStr =  Dialog.getString(); 
+ROIListStr = replace(ROIListStr,", ",",");
+ROIList =  split(ROIListStr,",");
+
+Prescript = Dialog.getString();
+
+
+
+coneMethodDIR = split(coneMethod," ");
+
+coneMethodDIR = String.join(coneMethodDIR," ");
+
+
+		
+coneString="model=["+coneMethod+"] desaturate desaturation=0.010 remove replace=0.001";
+
+rois = String.join(ROIList,".");
+
+fileSaveTitle = "Batch_RNLEnergy_"+coneMethod+"_"+rois+".txt";
+fileSaveDIR = imageDIR + fileSaveTitle;
+
+printCheck=0;
+
+
+if(checkBox=="Yes"){ 
+StartPosition=0; 
+EndPosition=0;
+fileList=newArray("");
+}
+
+
+
+
+for(j=StartPosition; j<=EndPosition; j++){
+
+
+setBatchMode(true);
+close("*");
+
+
+fileList2=getFileList( imageDIR + fileList[j] );
+mspecList=newArray();
+
+for(i=0; i<fileList2.length; i++){ // list only mspec files
+	if(endsWith(fileList2[i], ".mspec")==1) mspecList = Array.concat(mspecList, fileList2[i]);
+}
+
+for(l=0;l<mspecList.length;l++){
+
+
+imageString = "select=[" +  imageDIR + fileList[j] + mspecList[l] + "] image=[Linear Normalised Reflectance Stack]";
+roiString = imageDIR + fileList[j] + replace(mspecList[l],".mspec",".zip");
+
+
+// Prep Images
+//===========
+setPasteMode("Copy");
+run(" Load Multispectral Image", imageString);
+
+imgName = getTitle();
+
+
+rename("MSPEC_BASE");
+
+
+if(Prescript != "None"){
+	run(Prescript);
+}
+
+
+
+//Rescale
+nSelections = roiManager("count");
+	scaleFlag = 0;
+	for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( startsWith(selName, "Scale") == 1){ // found the scale bar - extract the info
+			scaleLoc = i;
+			scaleFlag = 1;
+			scaleInfo = split(selName, ":");
+			pixLength = scaleInfo[1];
+			scaleMm = scaleInfo[2];
+		}	
+	}//i
+
+
+if(minScale!="None"){
+
+minScale = parseFloat(minScale);
+
+scaleVal = parseFloat(pixLength)/parseFloat(scaleMm);
+w = getWidth();
+h = getHeight();
+rescale = minScale/scaleVal;
+w= w*(rescale);
+h=h*(rescale);
+run("Select None");
+run("Size...", "width=&w height=&h constrain average interpolation=Bilinear");
+
+	for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		run("Scale... ", "x=&rescale y=&rescale");	
+		roiManager("Update");
+	}//i
+
+}
+
+
+run("Select None");
+
+run("Convert to Cone Catch", coneString);
+
+if(lumMethod != "none"){
+run("Create Luminance Channel", lumMethod);
+wait(10);
+}
+
+rename("ConeCatch");
+
+
+if(useView=="Yes"){
+AcuityString = "acuity=[Cycles per degree] acuity_0="+acuity+" method=[Viewing distance] distance="+distanceView+" rescale=5";
+run("Acuity View", AcuityString);
+}
+
+
+
+
+oC=roiManager("count");
+for(i=0; i<oC;i++){
+v=oC-1-i;
+
+roiManager("select",v);
+nm = Roi.getName;
+
+ind=index(ROIList,nm);
+
+if(ind==-1) roiManager("delete");
+
+
+}
+
+
+
+
+if(checkBox == "No"){rnlDIR =  imageDIR + fileList[j] + "/RNL_" +acuity+"_"+distanceView+"_" + coneMethodDIR+"/";
+File.makeDirectory(rnlDIR);
+}
+
+if(checkBox == "Yes"){rnlDIR =  imageDIR + "/RNL_" +acuity+"_"+distanceView+"_" + coneMethodDIR+"/";
+File.makeDirectory(rnlDIR);
+}
+
+
+rename(imgName);
+
+
+rnlString = "visual=["+webMethod+"] resolution=4 select=["+rnlDIR+"]";
+
+run("1.0) Create RNL Colour Maps From ROIs", rnlString);
+
+
+
+
+
+}//( MSPEC);
+
+}// LOOP
+
+if(isOpen("Log"))close("Log");
+print("Done");

@@ -1,0 +1,320 @@
+/*
+_______________________________________________________________________
+
+	Title: Batch XYZ CIELAB
+	Author: George Hancock & Jolyon Trosckianko
+	Date: 10/03/2023
+.................................................................................................................
+
+Description:
+''''''''''''''''''''''''''''''''
+This tool is useful for batch measuring the CIE Lab (Mean,Min,Max,Dev) values of a set of MSPEC images.
+
+	- Especially useful for creating coloured plots.
+
+
+To run you will require a human XYZ model for the camera used to create your .mspec images.
+
+
+You can run this analysis on .mspec files within the same folder or within subfolders.
+
+
+
+
+_________________________________________________________________________
+*/
+
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+close("*");
+
+imageDIR = getDirectory("Select folder containing folders with multispectral image");
+
+fileList=getFileList(imageDIR);
+
+
+labelsDIR = imageDIR +"labels.txt";
+
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+saveTitles = newArray("Folder","MSPEC","ROI","L_Mean","L_Min","L_Max","L_Dev","A_Mean","A_Min","A_Max","A_Dev","B_Mean","B_Min","B_Max","B_Dev");
+saveTitleSTR = String.join(saveTitles,"\t");
+
+
+
+
+
+StartPosition = 0;
+
+
+
+// LISTING CONE CATCH MODELS
+
+	modelPath = getDirectory("plugins")+"Cone Models";
+
+	modelList=getFileList(modelPath);
+
+	modelNames = newArray();
+
+	for(i=0; i<modelList.length; i++){
+		if(endsWith(modelList[i], ".class")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".class",""));
+		if(endsWith(modelList[i], ".CLASS")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".CLASS",""));
+	}
+	
+	for(i=0; i<modelNames.length; i++)
+		modelNames[i] = replace(modelNames[i], "_", " ");
+
+
+
+// LIST VISUAL SYSTEM WEBER FRACTIONS
+
+	vsPath = getDirectory("plugins")+"micaToolbox/weberFractions";
+	vsList=getFileList(vsPath);
+	vsNames = newArray();
+	vsNames = Array.concat("Custom", vsNames);
+
+	for(i=0; i<vsList.length; i++){
+		if(endsWith(vsList[i], ".txt")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".txt",""));
+		if(endsWith(vsList[i], ".TXT")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".TXT",""));
+	}
+		
+		
+
+// LISTING LUMINANCE OPTIONS
+
+lumChannelArray = newArray("none", "lw", "lw mw", "x", "x y");
+yesNo = newArray("No","Yes");
+
+Dialog.create("Variables");
+
+Dialog.addChoice("All in same folder?",yesNo);
+Dialog.addChoice("Starting-Folder", fileList, fileList[0]); 
+Dialog.addChoice("End-Folder", fileList, fileList[fileList.length-1]); 
+Dialog.addChoice("XYZ_cone_model",modelNames, modelNames[0]);
+Dialog.addString("ROI Choices, if AllRois then it'll do all", "AllRois", 40);
+Dialog.addString("Pre_Script, type 'None' if no scipt", "None", 40);
+
+Dialog.show();
+
+checkBox = Dialog.getChoice();
+
+startFolder = Dialog.getChoice();
+		startIndex = index(fileList,startFolder);
+		StartPosition=startIndex;
+		
+endFolder = Dialog.getChoice();
+		endIndex = index(fileList,endFolder);
+		EndPosition=endIndex;
+		
+coneMethod = Dialog.getChoice();
+
+ROIListStr =  Dialog.getString(); 
+ROIListStr = replace(ROIListStr,", ",",");
+ROIList =  split(ROIListStr,",");
+
+Prescript = Dialog.getString();
+
+
+
+AllGate=0;
+if(ROIList[0]=="AllRois") AllGate=1;
+
+
+
+
+		
+coneString="model=["+coneMethod+"] desaturate desaturation=0.010 remove replace=0.001";
+
+rois = String.join(ROIList,".");
+
+fileSaveTitle = "Batch_LAB_"+rois+".txt";
+fileSaveDIR = imageDIR + fileSaveTitle;
+
+printCheck=0;
+
+
+// Loop from Start Folder
+
+if(checkBox=="Yes"){ 
+StartPosition=0; 
+EndPosition=0;
+fileList=newArray("");
+}
+
+
+
+if(File.exists(fileSaveDIR)){ File.delete(fileSaveDIR); }
+
+
+
+for(j=StartPosition; j<=EndPosition; j++){
+
+
+//setBatchMode(true);
+		setBatchMode(true);
+		close("*");
+
+
+				fileList2=getFileList( imageDIR + fileList[j] );
+				mspecList=newArray();
+
+				for(i=0; i<fileList2.length; i++){ // list only mspec files
+					if(endsWith(fileList2[i], ".mspec")==1) mspecList = Array.concat(mspecList, fileList2[i]);
+				}
+
+
+
+		for(l=0;l<mspecList.length;l++){
+
+		imageString = "select=[" +  imageDIR + fileList[j] + mspecList[l] + "] image=[Linear Normalised Reflectance Stack]";
+		roiString = imageDIR + fileList[j] + replace(mspecList[l],".mspec",".zip");
+
+
+
+// Prep Images
+//===========
+setPasteMode("Copy");
+run(" Load Multispectral Image", imageString);
+
+imgName = getTitle();
+
+rename("MSPEC_BASE");
+
+if(Prescript != "None"){
+	run(Prescript);
+}
+
+
+// Make Sure all ROIs are in Image
+//---------------------------------
+nROI = roiManager("count");
+run("Select All");
+roiManager("Add");
+
+for(i=0;i<nROI;i++){
+roiManager("select", 0);
+selName = getInfo("selection.name");
+roiManager("select", newArray(0,nROI-i));
+roiManager("AND");
+roiManager("Add");
+roiManager("select", roiManager("count")-1);
+roiManager("rename",selName);
+roiManager("select",0);
+roiManager("delete");
+}
+
+
+
+
+
+
+run("Convert to Cone Catch", coneString);
+run("XYZ to CIELAB 32Bit");
+rename("CIELAB");
+
+
+
+ROIindexes=newArray();
+
+
+		if(AllGate==0){
+		ROIindexes=newArray();
+
+		for(i=0;i<ROIList.length;i++){
+		temp = roiGetList(ROIList[i]);
+		ROIindexes=Array.concat(ROIindexes,temp);
+		}
+		
+		} else {
+		
+		ROIindexes=newArray();
+
+		for(i=0;i<roiManager("count");i++){
+		roiManager("select",i);
+		tStr = getInfo("selection.name");
+		if(!startsWith(tStr,"Scale")) ROIindexes=Array.concat(ROIindexes,i);
+		}
+		
+		
+		}
+		
+
+		
+if(ROIindexes.length>0){
+
+
+Titles= newArray();
+for(X=0;X<ROIindexes.length;X++){
+	
+	roiInd = ROIindexes[X];
+	roiManager("select", roiInd);
+	roi = getInfo("selection.name");
+	run("Enlarge...", "enlarge=-2");
+	MeasuresArray=newArray(fileList[j],mspecList[l],roi); // ResetMeasures
+		
+	for(i=0;i<3;i++){
+	
+	roiManager("select", roiInd);
+	setSlice(i+1);
+	getStatistics(area,mean,min,max,dev);
+	
+	MeasuresArray=Array.concat(MeasuresArray,mean,min,max,dev);
+	
+	}
+
+	if(!File.exists(fileSaveDIR)) File.append(saveTitleSTR, fileSaveDIR);
+
+	measureSTR = String.join(MeasuresArray,"\t");
+	File.append(measureSTR, fileSaveDIR);
+
+
+} // (X)
+} /// (ROI present)
+
+		} // (l)
+	
+
+}//( File loop);
+
+if(isOpen("Log"))close("Log");
+print("Done");

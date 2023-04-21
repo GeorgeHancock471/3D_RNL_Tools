@@ -1,0 +1,26 @@
+
+roiManager("deselect");
+setTool("polygon");
+waitForUser("Draw a polygon around the image");
+roiManager("Add");
+roiManager("Select", roiManager("count")-1);
+roiManager("Rename","polygonB");
+
+
+roiManager("select",roiManager("count")-1);
+Roi.getBounds(x,y,w,h);
+
+gW = getWidth();
+gH = getHeight();
+
+makeOval(x+w/2-42,y+h/2-42,84,84);
+
+roiManager("Add");
+roiManager("select",roiManager("count")-1);
+roiManager("Rename", "null-clutch");
+
+run("Scale... ", "x=3 y=3 centered");
+roiManager("Add");
+roiManager("select",roiManager("count")-1);
+roiManager("Rename", "null-nest");
+

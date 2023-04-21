@@ -1,0 +1,71 @@
+/*
+_______________________________________________________________________
+
+	Title: RNL Compare Frequencies
+	Author: Jolyon Trosckianko & George Hancock
+	Date: 10/03/2023
+.................................................................................................................
+
+Description:
+''''''''''''''''''''''''''''''''
+
+This tool measures the difference in colour frequencies between all ROIs
+
+_________________________________________________________________________
+*/
+
+
+
+
+imageDIR = getDirectory("Select folder containing folders with RNL colour maps");
+fileList=getFileList(imageDIR);
+
+RNL_List=newArray();
+
+for(i=0;i<fileList.length;i++){
+
+if(endsWith(fileList[i],".tif") || endsWith(fileList[i],".TIF") ) RNL_List=Array.concat(RNL_List);
+
+}
+
+
+saveDIR = imageDIR+"RNL_Differences.txt";
+
+if(File.exists(saveDIR)) File.delete(saveDIR);
+
+saveTitleArr = newArray("Map1","Map2","JD");
+saveTitleStr = String.join(saveTitleArr,"\t");
+
+File.append(saveDIR, saveTitleStr);
+
+
+for(i=0;i<RNL_List.length;i++){
+for(j=0;j<RNL_List.length;j++){
+
+if(i!=j){
+
+open(imageDIR+RNL_List[i]);
+rename("1");
+
+open(imageDIR+RNL_List[j]);
+rename("2");
+
+run("3.5) Compare RNL Colour Maps");
+
+measure = getResult("1",nResults-1);
+
+measureArray = newArray(i,j,measure);
+measureStr = String.join(measureArray,"\t");
+
+File.append(saveDIR, measureStr);
+
+
+}
+
+}
+}
+
+
+
+
+

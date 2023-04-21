@@ -1,0 +1,112 @@
+/*
+_______________________________________________________________________
+
+	Title: RNL Measure Distances
+	Author: George Hancock & Jolyon Trosckiano
+	Date: 10/03/2023
+.................................................................................................................
+
+Description:
+''''''''''''''''''''''''''''''''
+
+Will allow you to loop create Depth Maps
+
+_________________________________________________________________________
+*/
+
+
+
+
+//Select Scan Folder (Makes it easier to Quickly Transition when Saving and Opening)
+
+	scanDIR = getDirectory("Scan_Locations");
+
+
+
+//Select Save Folder(Makes it easier to Quickly Transition when Saving and Opening)
+
+
+	saveDIR = getDirectory("Save_Locations");
+
+
+
+
+
+nanOptions=newArray("NaN","Mean","Min");
+
+Dialog.create("Options");
+
+Dialog.addString("Custom_Script", "none"); 
+
+Dialog.addChoice("Replace-NaNs", nanOptions); 
+
+Dialog.show();
+
+
+
+customScript = Dialog.getString();
+
+nanHandle = Dialog.getChoice();
+
+
+endBoolean=1;
+while(endBoolean==1){
+
+File.setDefaultDir(scanDIR);
+
+
+plyDIR= File.openDialog("Select .ply");
+
+close("*");
+
+openDIR = "select=["+plyDIR+"]";
+
+
+while(roiManager("count")>0){
+roiManager("select",Array.getSequence(roiManager("count")));
+roiManager("Delete");
+}
+
+run("Import Normalised PLY",openDIR);
+
+close();
+
+run("Select None");
+getStatistics(area,mean,min,max);
+setThreshold(min,max);
+run("Create Selection");
+if(selectionType != -1){
+run("Make Inverse");
+roiManager("Add");
+roiManager("Select",roiManager("count")-1);
+roiManager("Rename","NaN-area");
+
+
+
+if(nanHandle=="Mean") run("Set...","value=mean");
+if(nanHandle=="Min") run("Set...","value=min");
+
+}
+
+
+run("Select None");
+run("Set Min And Max", "min=&min max=&max");
+
+if(customScript=="none") { waitForUser("Add Rois");
+} else {
+
+run(customScript);
+}
+
+run("From ROI Manager");
+
+File.setDefaultDir(saveDIR);
+
+saveAs("Tiff");
+
+getBoolean("Keep Going?")
+
+close("*");
+
+}
+

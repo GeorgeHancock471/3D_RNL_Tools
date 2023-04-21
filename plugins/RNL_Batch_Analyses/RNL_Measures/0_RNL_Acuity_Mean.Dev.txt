@@ -1,0 +1,418 @@
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+close("*");
+
+imageDIR = getDirectory("Select folder containing folders with multispectral image");
+
+fileList=getFileList(imageDIR);
+
+
+labelsDIR = imageDIR +"labels.txt";
+
+
+
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(tStr == String1){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+
+
+
+saveTitles = newArray("File","Image","ROI");
+
+
+
+
+
+
+StartPosition = 0;
+
+
+
+// LISTING CONE CATCH MODELS
+
+	modelPath = getDirectory("plugins")+"Cone Models";
+
+	modelList=getFileList(modelPath);
+
+	modelNames = newArray();
+
+	for(i=0; i<modelList.length; i++){
+		if(endsWith(modelList[i], ".class")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".class",""));
+		if(endsWith(modelList[i], ".CLASS")==1)
+			modelNames = Array.concat(modelNames,replace(modelList[i],".CLASS",""));
+	}
+	
+	for(i=0; i<modelNames.length; i++)
+		modelNames[i] = replace(modelNames[i], "_", " ");
+
+
+
+// LIST VISUAL SYSTEM WEBER FRACTIONS
+
+	vsPath = getDirectory("plugins")+"micaToolbox/weberFractions";
+	vsList=getFileList(vsPath);
+	vsNames = newArray();
+	vsNames = Array.concat("Custom", vsNames);
+
+	for(i=0; i<vsList.length; i++){
+		if(endsWith(vsList[i], ".txt")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".txt",""));
+		if(endsWith(vsList[i], ".TXT")==1)
+			vsNames = Array.concat(vsNames,replace(vsList[i],".TXT",""));
+	}
+		
+		yesNo = newArray("No","Yes");
+
+
+// LISTING LUMINANCE OPTIONS
+
+lumChannelArray = newArray("none", "lw", "lw mw", "x", "x y");
+
+Dialog.create("Variables");
+
+Dialog.addMessage("Scale, ROIs and Modifiers");
+
+Dialog.addMessage("Files and Channels \n ............................");
+Dialog.addChoice("All in same folder?",yesNo);
+Dialog.addChoice("Starting-Folder", fileList, fileList[0]); 
+Dialog.addChoice("End-Folder", fileList, fileList[fileList.length-1]); 
+Dialog.addChoice("cone_model",modelNames, modelNames[0]);
+Dialog.addChoice("lum_channel",lumChannelArray, lumChannelArray[0]);
+Dialog.addChoice("weber-system",vsNames, vsNames[0]);
+
+Dialog.addMessage("Acuity-Settings \n ............................");
+Dialog.addNumber("visual-Acuity", 13);
+Dialog.addChoice("Use Acuity View?",yesNo);
+Dialog.addNumber("view-distance", 500);
+
+Dialog.addMessage("Scale, ROIs and Modifiers \n ............................");
+Dialog.addString("minPxScale", "None");
+Dialog.addString("ROI Choices, if AllRois then it'll do all", "AllRois", 40);
+Dialog.addString("Pre-Script, type 'None' if no scipt", "None", 40);
+Dialog.show();
+
+checkBox = Dialog.getChoice();
+
+startFolder = Dialog.getChoice();
+		startIndex = index(fileList,startFolder);
+		StartPosition=startIndex;
+		
+endFolder = Dialog.getChoice();
+		endIndex = index(fileList,endFolder);
+		EndPosition=endIndex;
+		
+coneMethod = Dialog.getChoice();
+lumMethod  = Dialog.getChoice(); 	
+webMethod  = Dialog.getChoice(); 
+
+acuity = Dialog.getNumber();
+useView = Dialog.getChoice();
+distanceView = Dialog.getNumber();
+
+
+minScale = Dialog.getString();
+ROIListStr =  Dialog.getString(); 
+ROIListStr = replace(ROIListStr,", ",",");
+ROIList =  split(ROIListStr,",");
+
+Prescript = Dialog.getString();
+
+
+RNLtitles = newArray("X","Y","Z");
+
+
+AllGate=0;
+if(ROIList[0]=="AllRois") AllGate=1;
+
+		
+	coneString="model=["+coneMethod+"] desaturate desaturation=0.010 remove replace=0.001";
+
+	rois = String.join(ROIList,".");
+
+	fileSaveTitle = "Batch_RNL_MnDv_"+coneMethod+"_ac."+acuity+"_vd."+distanceView+"_"+rois+".txt";
+	fileSaveDIR = imageDIR + fileSaveTitle;
+
+	printCheck=0;
+	if(File.exists(fileSaveDIR)) printCheck=1;
+	
+
+// Loop from Start Folder
+
+if(checkBox=="Yes"){ 
+StartPosition=0; 
+EndPosition=0;
+fileList=newArray("");
+}
+
+
+for(j=StartPosition; j<=EndPosition; j++){
+
+
+		setBatchMode(true);
+		close("*");
+
+
+				fileList2=getFileList( imageDIR + fileList[j] );
+				mspecList=newArray();
+
+				for(i=0; i<fileList2.length; i++){ // list only mspec files
+					if(endsWith(fileList2[i], ".mspec")==1) mspecList = Array.concat(mspecList, fileList2[i]);
+				}
+
+
+
+		for(l=0;l<mspecList.length;l++){
+
+		imageString = "select=[" +  imageDIR + fileList[j] + mspecList[l] + "] image=[Linear Normalised Reflectance Stack]";
+		roiString = imageDIR + fileList[j] + replace(mspecList[l],".mspec",".zip");
+
+
+		// Prep Images (Load and Rescale)
+		//=====================================
+		setPasteMode("Copy");
+		run(" Load Multispectral Image", imageString);
+		
+		imgName = getTitle();
+		
+		rename("MSPEC_BASE");
+		
+		if(Prescript != "None"){
+		run(Prescript);
+		}
+
+		//Rescale
+		nSelections = roiManager("count");
+			scaleFlag = 0;
+			for(i=0; i<nSelections; i++){
+				roiManager("select", i);
+				selName = getInfo("selection.name");
+				if( startsWith(selName, "Scale") == 1){ // found the scale bar - extract the info
+					scaleLoc = i;
+					scaleFlag = 1;
+					scaleInfo = split(selName, ":");
+					pixLength = scaleInfo[1];
+					scaleMm = scaleInfo[2];
+				}	
+			}//i
+
+
+			if(minScale!="None"){
+
+			minScale = parseFloat(minScale);
+
+			scaleVal = parseFloat(pixLength)/parseFloat(scaleMm);
+			w = getWidth();
+			h = getHeight();
+			rescale = minScale/scaleVal;
+			w= w*(rescale);
+			h=h*(rescale);
+			run("Select None");
+			run("Size...", "width=&w height=&h constrain average interpolation=Bilinear");
+
+				for(i=0; i<nSelections; i++){
+					roiManager("select", i);
+					run("Scale... ", "x=&rescale y=&rescale");	
+					roiManager("Update");
+				}//i
+
+			}
+
+		// Prep Images (Cone Catch Conversion)
+		//=====================================
+
+		run("Select None");
+
+		run("Convert to Cone Catch", coneString);
+
+		if(lumMethod != "none"){
+		run("Create Luminance Channel", lumMethod);
+		wait(10);
+		}
+
+
+		if(useView=="Yes"){
+		AcuityString = "acuity=[Cycles per degree] acuity_0="+acuity+" method=[Viewing distance] distance="+distanceView+" rescale=5";
+		run("Acuity View", AcuityString);
+		}
+
+
+		rename("ConeCatch");
+
+		tStr = "visual=["+webMethod+"]";
+		run("Cone Catch to RNL Chromaticity",tStr);
+	
+
+		rename("RNL");
+		
+		selectImage("ConeCatch");
+		setSlice(nSlices);
+		run("Select None");
+		run("Duplicate...", "title=LUM");
+
+
+		selectImage("RNL");
+		
+
+
+		nSelections= roiManager("count");
+		
+		
+		if(AllGate==0){
+		ROIindexes=newArray();
+
+		for(i=0;i<ROIList.length;i++){
+		temp = roiGetList(ROIList[i]);
+		ROIindexes=Array.concat(ROIindexes,temp);
+		}
+		
+		} else {
+		
+		ROIindexes=newArray();
+
+		for(i=0;i<roiManager("count");i++){
+		roiManager("select",i);
+		tStr = getInfo("selection.name");
+		if(!startsWith(tStr,"Scale")) ROIindexes=Array.concat(ROIindexes,i);
+		}
+		
+		
+		}
+
+
+		
+		
+		for(X=0;X<ROIindexes.length;X++){
+			if(ROIindexes.length>0){
+			
+			
+			
+			selectImage("LUM");
+			roiInd=ROIindexes[X];
+			roiManager("select", roiInd);
+			roi=getInfo("selection.name");
+			
+			MeasuresArray=newArray(fileList[j],imgName,roi);
+			
+				for(i=0;i<nSlices;i++){
+				roiManager("select", roiInd);
+				setSlice(i+1);
+				slice=getInfo("slice.label");
+				measureTitleMean ="Lum_Mean";
+				measureTitleDev = "Lum_Dev";
+				measureTitleMin = "Lum_Min";
+				measureTitleMax = "Lum_Max";
+				
+			
+
+				if(printCheck==0){ saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev,measureTitleMin,measureTitleMax);}
+
+
+				getStatistics(area,mean,min,max,dev);
+		
+				
+				MeasuresArray=Array.concat(MeasuresArray,mean,dev,min,max);
+
+				} // i
+
+				selectImage("RNL");
+				roiInd=ROIindexes[X];
+				roiManager("select", roiInd);
+				roi=getInfo("selection.name");
+				selectImage("RNL");
+				for(i=0;i<nSlices;i++){
+				roiManager("select", roiInd);
+				setSlice(i+1);
+				slice=getInfo("slice.label");
+			
+				if(i<nSlices-1){
+				measureTitleMean = RNLtitles[i]+"_Mean";
+				measureTitleDev = RNLtitles[i]+"_Dev";
+				measureTitleMin = RNLtitles[i]+"_Min";
+				measureTitleMax = RNLtitles[i]+"_Max";
+				} else {
+				measureTitleMean = "Sat_Mean";
+				measureTitleDev = "Sat_Dev";
+				measureTitleMin = "Sat_Min";
+				measureTitleMax = "Sat_Max";
+				}
+
+				if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev,measureTitleMin,measureTitleMax);
+
+				getStatistics(area,mean,min,max,dev);
+			
+				
+				MeasuresArray=Array.concat(MeasuresArray,mean,dev,min,max);
+
+				} // i
+
+
+
+
+			} // if
+
+
+
+
+
+		if(printCheck==0){
+		saveTitleSTR = String.join(saveTitles,"\t");
+		File.append(saveTitleSTR, fileSaveDIR);
+		printCheck=1;
+		}
+
+		measureSTR = String.join(MeasuresArray,"\t");
+		File.append(measureSTR, fileSaveDIR);
+
+		} // X
+
+		
+
+		Array.show(ROIindexes);
+		
+
+
+
+
+		close("*");
+	
+		} // (l)
+	
+
+}//( File loop);
+
+	if(isOpen("Log"))close("Log");
+	print("Done");

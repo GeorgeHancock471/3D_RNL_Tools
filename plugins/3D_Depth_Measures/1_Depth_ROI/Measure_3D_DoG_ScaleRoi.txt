@@ -1,0 +1,275 @@
+close("*");
+
+
+//Dialog
+//============================================
+
+
+
+Dialog.create("Variables");
+Dialog.addMessage("Requires a folder with subfolders containg depth maps 'Depth Map.tif'");
+Dialog.addString("Measure_Rois", "background,clutch,nest,polygonB,circleN", 40);
+Dialog.addString("Crop_ROI, type 'None' if no scipt", "polygonB", 40);
+Dialog.addString("DoG_ROI", "polygonB", 40);
+
+Dialog.addNumber("N_Octaves", 6, 1, 10,"");
+Dialog.addNumber("Offset_Octaves", -2, 1, 10,"");
+Dialog.addString("ROI_Scale", "clutch", 40);
+Dialog.show();
+
+
+
+
+ROIListStr =  Dialog.getString(); 
+	ROIListStr = replace(ROIListStr,", ",",");
+	ROIList =  split(ROIListStr,",");
+
+CropROI = Dialog.getString();
+DOGROI = Dialog.getString();
+
+
+nOctaves =  Dialog.getNumber(); 
+offset =  Dialog.getNumber(); 
+wlROI = Dialog.getString();
+
+
+nOct=0;
+
+
+//Functions
+//============================================
+
+
+// ROI by Name
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+
+}
+
+
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+
+
+
+
+//Setup
+//============================================
+
+//setBatchMode(true);
+
+imageDIR = getDirectory("Select folder");
+
+labelsDIR = imageDIR +"labels.txt";
+
+fileList=getFileList(imageDIR);
+
+
+saveChoice = String.join(ROIList,".");
+
+savePath = imageDIR+"3D_Energy_ROI.WL_"+ saveChoice + ".txt";
+
+if(File.exists(savePath)) File.delete(savePath);
+
+scaleArray=newArray();
+
+for(i=0;i<nOctaves;i++){
+scaleArray = Array.concat(scaleArray,"Mean_Scale_"+i,"Dev_Scale_"+i);
+}
+
+
+
+saveTitles = Array.concat("Directory","ROI",scaleArray);
+
+saveTitlesStr = String.join(saveTitles,"\t");
+
+
+File.append(saveTitlesStr, savePath);
+
+// Run
+//=======================================================
+
+//Loop 
+for(z=0;z<fileList.length; z++){
+
+close("*");
+
+
+// Open Image
+//--------------------
+
+scanPath = imageDIR+fileList[z]+"Depth Map.tif";
+open(scanPath);
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(endsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+
+
+
+// Get Rois & Normalise
+//-------------------------------------
+
+run("To ROI Manager");
+
+nSelections=roiManager("count");
+
+wait(5);
+
+run("Select None");
+
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( endsWith(selName, wlROI ) == 1){ 
+		i = nSelections;
+		}	
+	}//i
+
+getStatistics(area);
+wl =  Math.sqrt(area);
+
+
+minS = Math.pow(2,(nOctaves+offset));
+scale=minS/(wl);
+w=getWidth()*scale;
+h=getHeight()*scale;
+run("Select None");
+run("Size...", "width=w height=h depth=1 constrain average interpolation=None");
+
+
+
+
+for(i=0; i<nSelections; i++){
+roiManager("select", i);
+run("Scale... ", "x=scale y=scale");
+roiManager("update");
+}
+
+
+
+if(CropROI != "None" && CropROI != "none" ){
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( endsWith(selName, CropROI ) == 1){ // found the scale bar - extract the info
+		Roi.getBounds(x1, y1, width1, height1);
+		run("Crop");
+		Roi.move(0,0);
+		i = nSelections;
+		}	
+	}//i
+
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( endsWith(selName, CropROI ) != 1){
+		Roi.getBounds(x, y, width, height);
+		Roi.move(x-x1,y-y1);
+		roiManager("update");
+		}
+	}//i
+	
+}
+
+
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+if( endsWith(selName, DOGROI ) == 1) i = nSelections;
+}
+
+run("DoG ROI bandpass smooth", "sigma1=1 sigma2=1.6 number_of_octaves="+nOctaves+" label=BG-1");
+
+rename("Energy");
+
+	
+
+
+
+
+run("Select None");
+
+for(nR = 0 ; nR<ROIList.length; nR++){
+
+selectImage("Energy");
+RoiChoice = ROIList[nR];
+ROI = roiGetList(RoiChoice);
+
+resultArray=newArray(RoiChoice);
+
+for(l=0;l<nSlices;l++){
+setSlice(l+1);
+roiManager("Select",ROI);
+getStatistics(area,mean,min,max,dev);
+resultArray=Array.concat(resultArray,mean,dev);
+}
+
+
+resultArray=Array.concat(fileList[z],resultArray);
+
+printArr=resultArray;
+printStr= String.join(printArr,"\t");
+
+File.append(printStr, savePath);
+
+}//NR
+
+
+
+}//(exists)
+}//(Loop)
+
+
+waitForUser("Done");

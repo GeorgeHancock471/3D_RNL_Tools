@@ -1,0 +1,216 @@
+close("*");
+
+Dialog.create("Variables");
+Dialog.addMessage("Requires a folder with subfolders containg depth maps 'Depth Map.tif'");
+Dialog.addString("ROI Choices", "background,clutch,nest,circleN", 40);
+Dialog.addString("Crop ROI, type 'None' if no scipt", "polygonB", 40);
+Dialog.addString("GaboROI", "polygonB", 40);
+Dialog.show();
+
+ROIListStr =  Dialog.getString(); 
+ROIListStr = replace(ROIListStr,", ",",");
+ROIList =  split(ROIListStr,",");
+
+CropROI = Dialog.getString();
+
+DOGROI = Dialog.getString();
+
+
+
+//Functions
+//============================================
+
+
+// ROI by Name
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(startsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+
+}
+
+
+
+
+
+
+// Index
+//---------------------------------------------------
+// Allows you to obtain the index of a Value within an Array.
+
+  function index(a, value) {
+      for (i=0; i<a.length; i++)
+          if (a[i]==value) return i;
+      return -1;
+  }
+
+
+
+
+
+//Setup
+//============================================
+
+//setBatchMode(true);
+
+imageDIR = getDirectory("Select folder");
+
+labelsDIR = imageDIR +"labels.txt";
+
+fileList=getFileList(imageDIR);
+
+
+saveChoice = String.join(ROIList,".");
+
+savePath = imageDIR+"3D_Measures_"+ saveChoice + ".txt";
+
+if(File.exists(savePath)) File.delete(savePath);
+
+msr = newArray(ROIList.length);
+
+
+
+saveTitles = Array.concat("Directory","ROI","Area","Mean","Min","Max","Dev");
+
+saveTitlesStr = String.join(saveTitles,"\t");
+
+
+File.append(saveTitlesStr, savePath);
+
+// Run
+//=======================================================
+
+//Loop 
+for(z=0;z<fileList.length; z++){
+
+close("*");
+
+
+// Open Image
+//--------------------
+
+scanPath = imageDIR+fileList[z]+"Depth Map.tif";
+open(scanPath);
+
+
+
+// ROI
+//---------------------------------------------------
+function 	roiGetList(String1){
+
+roiList1 = newArray();
+roiLocs1 = newArray();
+roiFullList1 = newArray();
+nROIs1 = roiManager("count");
+
+for(j=0; j<nROIs1; j++){
+	roiManager("Select", j);
+	tStr = getInfo("selection.name");
+	roiFullList1 = Array.concat(roiFullList1, tStr);
+	if(endsWith(tStr, String1) == true){
+		roiList1 = Array.concat(roiList1, tStr);
+		roiLocs1= Array.concat(roiLocs1, j);
+		}
+	}
+
+return roiLocs1;
+}
+
+
+
+
+
+// Get Rois & Normalise
+//-------------------------------------
+
+run("To ROI Manager");
+
+wait(5);
+
+nSelections=roiManager("count");
+
+if(CropROI != "None" && CropROI != "none" ){
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( endsWith(selName, CropROI ) == 1){ // found the scale bar - extract the info
+		Roi.getBounds(x1, y1, width1, height1);
+		run("Crop");
+		Roi.move(0,0);
+		i = nSelections;
+		}	
+	}//i
+
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+		if( endsWith(selName, CropROI ) != 1){
+		Roi.getBounds(x, y, width, height);
+		Roi.move(x-x1,y-y1);
+		roiManager("update");
+		}
+	}//i
+	
+}
+
+
+for(i=0; i<nSelections; i++){
+		roiManager("select", i);
+		selName = getInfo("selection.name");
+if( endsWith(selName, DOGROI ) == 1) i = nSelections;
+}
+
+run("Select None");
+
+for(nR = 0 ; nR<ROIList.length; nR++){
+
+RoiChoice = ROIList[nR];
+
+
+ROI = roiGetList(RoiChoice);
+
+resultArray=newArray(RoiChoice);
+
+for(l=0;l<nSlices;l++){
+setSlice(l+1);
+roiManager("Select",ROI);
+
+getStatistics(area,mean,min,max,dev);
+
+resultArray=Array.concat(resultArray,area,mean,min,max,dev);
+
+}
+
+
+resultArray=Array.concat(fileList[z],resultArray);
+
+
+printArr=resultArray;
+printStr= String.join(printArr,"\t");
+
+File.append(printStr, savePath);
+
+}//NR
+
+
+
+}//(exists)
+}//(Loop)
+
+
+waitForUser("Done");

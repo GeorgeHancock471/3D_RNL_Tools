@@ -1,0 +1,37 @@
+run("Save ROIs");
+
+setTool("Draw Oval");
+waitForUser("Draw a circle around the clutch - depression");
+
+run("Scale... ", "x=1.1 y=1.1 centered");
+roiManager("Add");
+roiManager("Select", roiManager("count")-1);
+roiManager("Rename","clutch");
+
+run("Scale... ", "x=2 y=2 centered");
+roiManager("Add");
+roiManager("Select", roiManager("count")-1);
+roiManager("Rename","circleN");
+
+setTool("polygon");
+waitForUser("Draw a polygon around the image");
+roiManager("Add");
+roiManager("Select", roiManager("count")-1);
+roiManager("Rename","polygonB");
+
+
+roiManager("Select", newArray(0,1));
+roiManager("XOR");
+roiManager("Add");
+roiManager("Select", roiManager("count")-1);
+roiManager("Rename","nest");
+
+
+roiManager("Select", newArray(1,2));
+roiManager("XOR");
+roiManager("Add");
+roiManager("Select", roiManager("count")-1);
+roiManager("Rename","background");
+
+setTool("multipoint");
+waitForUser("Add Egg Rois");
