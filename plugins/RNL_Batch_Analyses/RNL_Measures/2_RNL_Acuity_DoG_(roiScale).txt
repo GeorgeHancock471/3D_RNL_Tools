@@ -1,3 +1,6 @@
+TestMode = 0;
+
+rnlNames=newArray("X","Y","Z");
 
 
 // Index
@@ -45,7 +48,7 @@ return roiLocs1;
 }
 
 
-saveTitles = newArray("File");
+saveTitles = newArray("File","MSPEC");
 
 
 
@@ -96,30 +99,29 @@ StartPosition = 0;
 
 lumChannelArray = newArray("none", "lw", "lw mw", "x", "x y");
 
-
+yesNo=newArray("No","Yes");
+folderStore=newArray("One","Multiple");
 
 Dialog.create("Variables");
-
+Dialog.addChoice("All in one folder?", folderStore,"One"); 
 Dialog.addChoice("Starting-Folder", fileList, fileList[0]); 
 Dialog.addChoice("End-Folder", fileList, fileList[fileList.length-1]); 
 Dialog.addChoice("cone_model",modelNames, modelNames[0]);
 Dialog.addChoice("lum_channel",lumChannelArray, lumChannelArray[0]);
 Dialog.addChoice("weber-system",vsNames, vsNames[0]);
 
-
 Dialog.addMessage("Acuity-Settings \n ............................");
 Dialog.addNumber("visual-Acuity", 13);
 Dialog.addChoice("Use Acuity View?",yesNo);
 Dialog.addNumber("view-distance", 500);
 
-
-
-Dialog.addString("ROI Choices", "egg1,egg2,egg3,egg4,egg5,ClutchEx,Nest,Background,CircleN", 40);
-Dialog.addString("Pre-Script, type 'None' if no scipt", "Normalise & Rois", 40);
-Dialog.addString("Crop ROI, type 'None' if no scipt", "circleB", 40);
-Dialog.addString("DoG ROI, type 'None' if no scipt", "circleB", 40);
-
+Dialog.addString("ROI Choices, 'allRois' if all barring scalebar", "AllRois", 40);
+Dialog.addString("Pre-Script, type 'None' if no scipt", "None", 40);
+Dialog.addString("Crop ROI, type 'None' if no crop, 'Current' if measure ROI", "None", 40);
+Dialog.addString("DoG ROI, type 'None' if no crop, 'Current' if measure ROI", "Current", 40);
 Dialog.show();
+
+oneFolder = Dialog.getChoice();
 
 startFolder = Dialog.getChoice();
 		startIndex = index(fileList,startFolder);
@@ -132,6 +134,7 @@ endFolder = Dialog.getChoice();
 coneMethod = Dialog.getChoice();
 lumMethod  = Dialog.getChoice(); 	
 webMethod  = Dialog.getChoice(); 
+
 
 
 
@@ -154,6 +157,8 @@ DoGROI = Dialog.getString();
 
 
 Dialog.create("DoG");
+Dialog.addMessage("N octaves determines the number of scales, largest scale = ROI Scale");
+Dialog.addMessage("Offset is whether the scale should go above or beloe, -2 equals 2x and 4x above");
 Dialog.addNumber("N_Octaves", 6, 1, 10,"");
 Dialog.addNumber("Offset Octaves", -2, 1, 10,"");
 Dialog.addString("ROI_Scale", "Clutch", 40);
@@ -165,7 +170,7 @@ offset =  Dialog.getNumber();
 wlROI = Dialog.getString();
 
 
-		
+				
 coneString="model=["+coneMethod+"] desaturate desaturation=0.010 remove replace=0.001";
 
 rois = String.join(ROIList,".");
@@ -175,31 +180,41 @@ fileSaveDIR = imageDIR + fileSaveTitle;
 
 printCheck=0;
 
+
+if(oneFolder=="One"){
+StartPosition=0;
+EndPosition=0;
+}
+
+
 for(j=StartPosition; j<=EndPosition; j++){
 
 
 //setBatchMode(true);
 close("*");
 
-setBatchMode(true);
+setBatchMode(false);
+
+
+if(oneFolder=="Multiple") fileList2=getFileList( imageDIR + fileList[j] );
+if(oneFolder=="One") fileList2=getFileList( imageDIR );
 
 
 
-
-fileList2=getFileList( imageDIR + fileList[j] );
 mspecList=newArray();
 
 for(i=0; i<fileList2.length; i++){ // list only mspec files
 	if(endsWith(fileList2[i], ".mspec")==1) mspecList = Array.concat(mspecList, fileList2[i]);
-	if(endsWith(fileList2[i], ".zip")==1) mspecList = Array.concat(mspecList, fileList2[i]);
 }
 
-if(mspecList.length>0){
+for(nm=0; nm<mspecList.length; nm++){
 
+if(oneFolder=="Multiple")imageString = "select=[" +  imageDIR + fileList[j] + mspecList[nm] + "] image=[Linear Normalised Reflectance Stack]";
+if(oneFolder=="Multiple")roiString = imageDIR + fileList[j] + replace(mspecList[nm],".mspec",".zip");
+if(oneFolder=="One")imageString = "select=[" +  imageDIR  + mspecList[nm] + "] image=[Linear Normalised Reflectance Stack]";
+if(oneFolder=="One")roiString = imageDIR + replace(mspecList[nm],".mspec",".zip");
 
-imageString = "select=[" +  imageDIR + fileList[j] + mspecList[0] + "] image=[Linear Normalised Reflectance Stack]";
-roiString = imageDIR + fileList[j] + replace(mspecList[0],".mspec",".zip");
-
+print(imageString);
 
 // Prep Images
 //===========
@@ -231,7 +246,8 @@ roiManager("select",0);
 roiManager("delete");
 }
 
-
+roiManager("select",0);
+roiManager("delete");
 
 // Get Scalebar Old
 //-----------------------------------------------
@@ -332,6 +348,7 @@ run("Size...", "width=&w height=&h constrain average interpolation=Bilinear");
 
 setBatchMode("show");
 
+
 rename("ConeCatch");
 
 tStr = "visual=["+webMethod+"]";
@@ -341,14 +358,13 @@ rename("RNL");
 
 selectImage("ConeCatch");
 setSlice(nSlices);
+run("Select None");
 run("Duplicate...", "title=LUM");
 
 
 selectImage("RNL");
 
-
 nSelections= roiManager("count");
-
 
 
 
@@ -385,24 +401,42 @@ for(i=0; i<nSelections; i++){
 
 DogROIList = roiGetList(DoGROI);
 
-ROIindexes=newArray();
 
-for(i=0;i<ROIList.length;i++){
-temp = roiGetList(ROIList[i]);
-ROIindexes=Array.concat(ROIindexes,temp);
-}
+
+//List All Rois
+//--------------------------------------------------------------
+
+		if(AllGate==0){
+		ROIindexes=newArray();
+
+		for(i=0;i<ROIList.length;i++){
+		temp = roiGetList(ROIList[i]);
+		ROIindexes=Array.concat(ROIindexes,temp);
+		}
+		
+		} else {
+		
+		ROIindexes=newArray();
+
+		for(i=0;i<roiManager("count");i++){
+		roiManager("select",i);
+		tStr = getInfo("selection.name");
+		if(!startsWith(tStr,"Scale")) ROIindexes=Array.concat(ROIindexes,i);
+		}
+		
+		
+		}
+
 
 if(ROIindexes.length>0){
-
-
-
-
-
 run("Select None");
 
-DoGArray= newArray();
 
-//setBatchMode(true);
+
+
+if(DoGROI != "Current"){
+
+DoGArray= newArray();
 
 selectImage("LUM");
 oldTitle = getTitle();
@@ -430,6 +464,7 @@ DoGArray= Array.concat(DoGArray,Name);
 selectImage("RNL");
 }
 
+}// Not Current
 
 
 
@@ -442,13 +477,12 @@ for(X=0;X<ROIindexes.length;X++){
 roiInd = ROIindexes[X];
 roiManager("select", roiInd);
 roi = getInfo("selection.name");
-run("Enlarge...", "enlarge=-2");
 MeasuresArray=newArray(roi); // ResetMeasures
 
 	selectImage("LUM");
 	roiManager("select", roiInd);
-	run("Enlarge...", "enlarge=-2");
 	slice=getInfo("slice.label");
+	slice="\""+slice+"\"";
 	measureTitleMean = "LUM_"+slice+"_Mean";
 	measureTitleDev = " LUM_"+slice+"_Dev";
 
@@ -458,10 +492,13 @@ MeasuresArray=newArray(roi); // ResetMeasures
 
 	selectImage("RNL");
 	roiManager("select", roiInd);
-	run("Enlarge...", "enlarge=-2");
 	for(i=0;i<nSlices;i++){
 	setSlice(i+1);
+	
+	if(i<nSlices-1){channel=rnlNames[i];} else { channel="Saturation"; }
+	
 	slice=getInfo("slice.label");
+	slice="\""+slice+"\"";
 	measureTitleMean = "RNL_"+slice+"_Mean";
 	measureTitleDev = " RNL_"+slice+"_Dev";
 	
@@ -471,30 +508,109 @@ MeasuresArray=newArray(roi); // ResetMeasures
 	}
 
 
+if(DoGROI != "Current"){
 
-for(Y=0;Y<DoGArray.length;Y++){
-selectImage(DoGArray[Y]);
-roiManager("select", roiInd);
-run("Enlarge...", "enlarge=-2");
+		for(Y=0;Y<DoGArray.length;Y++){
 
-for(i=0;i<nSlices;i++){
-setSlice(i+1);
+		selectImage(DoGArray[Y]);
+		roiManager("select", roiInd);
 
-slice=getInfo("slice.label");
-measureTitleMean = DoGArray[Y]+"_"+slice+"_Mean";
-measureTitleDev = DoGArray[Y]+"_"+slice+"_Dev";
+		for(i=0;i<nSlices;i++){
+		setSlice(i+1);
 
-if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
+		slice=getInfo("slice.label");
+		slice="\""+slice+"\"";
+		measureTitleMean = DoGArray[Y]+"_"+slice+"_Mean";
+		measureTitleDev = DoGArray[Y]+"_"+slice+"_Dev";
 
-getStatistics(area,mean,min,max,dev);
-MeasuresArray=Array.concat(MeasuresArray,d2s(mean, 20),d2s(dev, 20));
+		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
+
+		getStatistics(area,mean,min,max,dev);
+		MeasuresArray=Array.concat(MeasuresArray,d2s(mean, 20),d2s(dev, 20));
+
+		} // (i)
 
 
+		} // (Y)
 
-} // (i)
+} //Not Current
 
 
-} // (Y)
+if(DoGROI == "Current"){
+
+
+		//Luminance
+		selectImage("LUM");
+		
+		oldTitle = getTitle();
+		sliceTitle = getInfo("slice.label");
+		sliceTitle = replace(sliceTitle," ","");
+		roiManager("select", roiInd);
+		run("DoG ROI bandpass smooth", "sigma1=1 sigma2=1.6 number_of_octaves="+nOctaves+" label=BG-1");
+		Name = oldTitle+"_"+sliceTitle+"_DoG";
+		rename(Name);
+		selectImage(Name);
+		roiManager("select", roiInd);
+	
+		Roi.move(0,0);
+		for(i=0;i<nSlices;i++){
+		setSlice(i+1);
+		slice=getInfo("slice.label");
+		slice="\""+slice+"\"";
+		measureTitleMean = Name+"_"+slice+"_Mean";
+		measureTitleDev = Name+"_"+slice+"_Dev";
+		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
+		getStatistics(area,mean,min,max,dev);
+		MeasuresArray=Array.concat(MeasuresArray,d2s(mean, 20),d2s(dev, 20));
+		} // (i)
+
+		close();
+
+		//RNL
+		selectImage("RNL");
+		
+		
+		selectImage("RNL");
+		numSlice = nSlices;
+		
+		
+		for(r=0;r<numSlice;r++){
+		selectImage("RNL");
+		setSlice(r+1);
+		oldTitle = getTitle();
+		sliceTitle = getInfo("slice.label");
+		sliceTitle = replace(sliceTitle," ","");
+		if(DoGROI!="None") roiManager("select", DogROIList);
+		run("DoG ROI bandpass smooth", "sigma1=1 sigma2=1.6 number_of_octaves="+nOctaves+" label=BG-1");
+		Name = oldTitle+"_"+sliceTitle+"_DoG";
+		rename(Name);
+
+		selectImage(Name);
+		roiManager("select", roiInd);
+		Roi.move(0,0);
+		for(i=0;i<nSlices;i++){
+		setSlice(i+1);
+		slice=getInfo("slice.label");
+		slice="\""+slice+"\"";
+		measureTitleMean = Name+"_"+slice+"_Mean";
+		measureTitleDev = Name+"_"+slice+"_Dev";
+		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
+		getStatistics(area,mean,min,max,dev);
+		MeasuresArray=Array.concat(MeasuresArray,d2s(mean, 20),d2s(dev, 20));
+		} // (i)
+
+
+		close();
+
+		}
+
+
+	
+		
+
+	
+
+}// Current
 
 
 if(printCheck==0){
@@ -503,18 +619,27 @@ File.append(saveTitleSTR, fileSaveDIR);
 printCheck=1;
 }
 
-MeasuresArray=Array.concat(fileList[j],MeasuresArray);
+
+if(TestMode==0){
+
+MeasuresArray=Array.concat(fileList[j],mspecList[j],MeasuresArray);
 measureSTR = String.join(MeasuresArray,"\t");
 File.append(measureSTR, fileSaveDIR);
 
-Array.show(saveTitles,MeasuresArray);
+//Array.show(saveTitles,MeasuresArray);
+
+}
+
+if(TestMode==1){setBatchMode("exit and display"); exit };
+
 
 
 } // (X)
 } /// (ROI present)
+
+
+close("*");
 } // (MSPEC Exist)
-
-
 
 }//( File loop);
 
