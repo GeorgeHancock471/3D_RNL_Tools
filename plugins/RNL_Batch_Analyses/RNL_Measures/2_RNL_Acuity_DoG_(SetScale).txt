@@ -471,9 +471,12 @@ MeasuresArray=newArray(roi); // ResetMeasures
 	selectImage("LUM");
 	roiManager("select", roiInd);
 	slice=getInfo("slice.label");
-	slice="\""+slice+"\"";
+	
 	measureTitleMean = "LUM_"+slice+"_Mean";
 	measureTitleDev = " LUM_"+slice+"_Dev";
+	
+	measureTitleMean="\""+measureTitleMean+"\"";
+	measureTitleDev="\""+measureTitleMean+"\"";
 
 	if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);	
 	getStatistics(area,mean,min,max,dev);
@@ -487,9 +490,12 @@ MeasuresArray=newArray(roi); // ResetMeasures
 	if(i<nSlices-1){channel=rnlNames[i];} else { channel="Saturation"; }
 	
 	slice=getInfo("slice.label");
-	slice="\""+slice+"\"";
+	
 	measureTitleMean = "RNL_"+slice+"_Mean";
 	measureTitleDev = " RNL_"+slice+"_Dev";
+	
+	measureTitleMean="\""+measureTitleMean+"\"";
+	measureTitleDev="\""+measureTitleMean+"\"";
 	
 	if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);	
 	getStatistics(area,mean,min,max,dev);
@@ -508,9 +514,12 @@ if(DoGROI != "Current"){
 		setSlice(i+1);
 
 		slice=getInfo("slice.label");
-		slice="\""+slice+"\"";
+		
 		measureTitleMean = DoGArray[Y]+"_"+slice+"_Mean";
 		measureTitleDev = DoGArray[Y]+"_"+slice+"_Dev";
+		
+		measureTitleMean="\""+measureTitleMean+"\"";
+		measureTitleDev="\""+measureTitleMean+"\"";
 
 		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
 
@@ -545,9 +554,13 @@ if(DoGROI == "Current"){
 		for(i=0;i<nSlices;i++){
 		setSlice(i+1);
 		slice=getInfo("slice.label");
-		slice="\""+slice+"\"";
+		
 		measureTitleMean = Name+"_"+slice+"_Mean";
 		measureTitleDev = Name+"_"+slice+"_Dev";
+		
+		measureTitleMean="\""+measureTitleMean+"\"";
+		measureTitleDev="\""+measureTitleMean+"\"";
+		
 		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
 		getStatistics(area,mean,min,max,dev);
 		MeasuresArray=Array.concat(MeasuresArray,d2s(mean, 20),d2s(dev, 20));
@@ -580,9 +593,13 @@ if(DoGROI == "Current"){
 		for(i=0;i<nSlices;i++){
 		setSlice(i+1);
 		slice=getInfo("slice.label");
-		slice="\""+slice+"\"";
+		
 		measureTitleMean = Name+"_"+slice+"_Mean";
 		measureTitleDev = Name+"_"+slice+"_Dev";
+		
+		measureTitleMean="\""+measureTitleMean+"\"";
+		measureTitleDev="\""+measureTitleMean+"\"";
+		
 		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
 		getStatistics(area,mean,min,max,dev);
 		MeasuresArray=Array.concat(MeasuresArray,d2s(mean, 20),d2s(dev, 20));
