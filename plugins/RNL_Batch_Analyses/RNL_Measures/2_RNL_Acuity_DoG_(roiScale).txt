@@ -155,6 +155,9 @@ CropROI = Dialog.getString();
 DoGROI = Dialog.getString();
 
 
+AllGate=0;
+if(ROIList[0]=="AllRois") AllGate=1;
+
 
 Dialog.create("DoG");
 Dialog.addMessage("N octaves determines the number of scales, largest scale = ROI Scale");
@@ -485,8 +488,6 @@ MeasuresArray=newArray(roi); // ResetMeasures
 	measureTitleMean = "LUM_"+slice+"_Mean";
 	measureTitleDev = " LUM_"+slice+"_Dev";
 	
-	measureTitleMean="\""+measureTitleMean+"\"";
-	measureTitleDev="\""+measureTitleMean+"\"";
 
 	if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);	
 	getStatistics(area,mean,min,max,dev);
@@ -503,9 +504,6 @@ MeasuresArray=newArray(roi); // ResetMeasures
 	//
 	measureTitleMean = "RNL_"+slice+"_Mean";
 	measureTitleDev = " RNL_"+slice+"_Dev";
-	
-	measureTitleMean="\""+measureTitleMean+"\"";
-	measureTitleDev="\""+measureTitleMean+"\"";
 	
 	if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);	
 	getStatistics(area,mean,min,max,dev);
@@ -528,8 +526,6 @@ if(DoGROI != "Current"){
 		measureTitleMean = DoGArray[Y]+"_"+slice+"_Mean";
 		measureTitleDev = DoGArray[Y]+"_"+slice+"_Dev";
 		
-		measureTitleMean="\""+measureTitleMean+"\"";
-		measureTitleDev="\""+measureTitleMean+"\"";
 
 		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
 
@@ -568,8 +564,6 @@ if(DoGROI == "Current"){
 		measureTitleMean = Name+"_"+slice+"_Mean";
 		measureTitleDev = Name+"_"+slice+"_Dev";
 		
-		measureTitleMean="\""+measureTitleMean+"\"";
-		measureTitleDev="\""+measureTitleMean+"\"";
 		
 		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
 		getStatistics(area,mean,min,max,dev);
@@ -606,9 +600,7 @@ if(DoGROI == "Current"){
 		
 		measureTitleMean = Name+"_"+slice+"_Mean";
 		measureTitleDev = Name+"_"+slice+"_Dev";
-		
-		measureTitleMean="\""+measureTitleMean+"\"";
-		measureTitleDev="\""+measureTitleMean+"\"";
+
 		
 		if(printCheck==0) saveTitles=Array.concat(saveTitles,measureTitleMean,measureTitleDev);
 		getStatistics(area,mean,min,max,dev);
@@ -621,10 +613,6 @@ if(DoGROI == "Current"){
 		}
 
 
-	
-		
-
-	
 
 }// Current
 
@@ -638,11 +626,12 @@ printCheck=1;
 
 if(TestMode==0){
 
-MeasuresArray=Array.concat(fileList[j],mspecList[j],MeasuresArray);
+MeasuresArray=Array.concat(fileList[j],mspecList[nm],MeasuresArray);
 measureSTR = String.join(MeasuresArray,"\t");
 File.append(measureSTR, fileSaveDIR);
 
 //Array.show(saveTitles,MeasuresArray);
+
 
 }
 
